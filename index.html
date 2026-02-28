@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw 보안 취약점 리서치 | 오픈클로 상업용 위험성 분석</title>
+  <meta name="description" content="오픈클로(OpenClaw) AI 에이전트의 보안 취약점과 기업 환경에서의 사용 위험성을 분석한 리서치 보고서">
+  <meta property="og:title" content="OpenClaw 보안 취약점 리서치">
+  <meta property="og:description" content="CVE-2026-25253, 공급망 공격, 기업 사용 금지 현황 등 오픈클로의 보안 위험성 종합 분석">
+  <meta property="og:type" content="article">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg-primary: #0a0e17;
+      --bg-secondary: #111827;
+      --bg-card: #1a2332;
+      --bg-card-hover: #1f2b3d;
+      --border: #2a3a50;
+      --text-primary: #e8edf5;
+      --text-secondary: #8b9bb4;
+      --text-muted: #5a6a80;
+      --accent-red: #ef4444;
+      --accent-red-dim: rgba(239,68,68,0.15);
+      --accent-orange: #f59e0b;
+      --accent-orange-dim: rgba(245,158,11,0.15);
+      --accent-blue: #3b82f6;
+      --accent-blue-dim: rgba(59,130,246,0.15);
+      --accent-green: #10b981;
+      --accent-green-dim: rgba(16,185,129,0.15);
+      --accent-purple: #8b5cf6;
+      --accent-purple-dim: rgba(139,92,246,0.15);
+      --accent-cyan: #06b6d4;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.7;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ─── NAV ─── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(10,14,23,0.85);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1rem;
+    }
+    .nav-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 56px;
+    }
+    .nav-logo {
+      font-weight: 800; font-size: 1.05rem;
+      color: var(--accent-red);
+      display: flex; align-items: center; gap: 8px;
+      text-decoration: none;
+    }
+    .nav-links { display: flex; gap: 4px; }
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none; font-size: 0.82rem; font-weight: 500;
+      padding: 6px 12px; border-radius: 6px;
+      transition: all 0.2s;
+    }
+    .nav-links a:hover { color: var(--text-primary); background: var(--bg-card); }
+
+    .nav-hamburger {
+      display: none; background: none; border: none; cursor: pointer;
+      width: 32px; height: 32px; position: relative;
+    }
+    .nav-hamburger span {
+      display: block; width: 20px; height: 2px;
+      background: var(--text-secondary);
+      position: absolute; left: 6px;
+      transition: all 0.3s;
+    }
+    .nav-hamburger span:nth-child(1) { top: 9px; }
+    .nav-hamburger span:nth-child(2) { top: 15px; }
+    .nav-hamburger span:nth-child(3) { top: 21px; }
+
+    /* ─── HERO ─── */
+    .hero {
+      padding: 120px 1.5rem 60px;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(239,68,68,0.06) 0%, transparent 60%);
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--accent-red-dim);
+      color: var(--accent-red);
+      font-size: 0.78rem; font-weight: 600;
+      padding: 6px 14px; border-radius: 20px;
+      margin-bottom: 1.5rem;
+      border: 1px solid rgba(239,68,68,0.25);
+    }
+    .hero-badge .pulse {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent-red);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.4); }
+    }
+    .hero h1 {
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      font-weight: 900; line-height: 1.2;
+      margin-bottom: 1rem;
+      letter-spacing: -0.02em;
+    }
+    .hero h1 .highlight { color: var(--accent-red); }
+    .hero p {
+      font-size: clamp(0.95rem, 2vw, 1.15rem);
+      color: var(--text-secondary);
+      max-width: 640px; margin: 0 auto 2rem;
+    }
+    .hero-meta {
+      display: flex; justify-content: center; gap: 2rem;
+      flex-wrap: wrap; color: var(--text-muted); font-size: 0.82rem;
+    }
+    .hero-meta span { display: flex; align-items: center; gap: 4px; }
+
+    /* ─── SECTIONS ─── */
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 1.5rem; }
+    section { padding: 4rem 0; }
+    .section-label {
+      display: inline-block;
+      font-size: 0.72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--accent-blue);
+      margin-bottom: 0.75rem;
+    }
+    .section-title {
+      font-size: clamp(1.5rem, 3.5vw, 2rem);
+      font-weight: 800; margin-bottom: 1rem;
+      letter-spacing: -0.01em;
+    }
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 0.95rem; max-width: 600px;
+      margin-bottom: 2.5rem;
+    }
+
+    /* ─── STAT CARDS (HERO) ─── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem; margin-top: 3rem;
+    }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.5rem;
+      text-align: center;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .stat-card:hover { transform: translateY(-2px); border-color: var(--accent-blue); }
+    .stat-number {
+      font-size: 2rem; font-weight: 900;
+      background: linear-gradient(135deg, var(--accent-red), var(--accent-orange));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stat-label { font-size: 0.82rem; color: var(--text-secondary); margin-top: 4px; }
+
+    /* ─── VULN CARDS ─── */
+    .vuln-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+    .vuln-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 1.75rem;
+      position: relative; overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .vuln-card:hover { transform: translateY(-3px); border-color: var(--accent-red); }
+    .vuln-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+    .vuln-card.critical::before { background: linear-gradient(90deg, var(--accent-red), #dc2626); }
+    .vuln-card.high::before { background: linear-gradient(90deg, var(--accent-orange), #d97706); }
+    .vuln-card.medium::before { background: linear-gradient(90deg, var(--accent-blue), #2563eb); }
+
+    .vuln-header { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
+    .vuln-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem; flex-shrink: 0;
+    }
+    .vuln-card.critical .vuln-icon { background: var(--accent-red-dim); }
+    .vuln-card.high .vuln-icon { background: var(--accent-orange-dim); }
+    .vuln-card.medium .vuln-icon { background: var(--accent-blue-dim); }
+
+    .vuln-title { font-weight: 700; font-size: 1rem; }
+    .vuln-severity {
+      display: inline-block; font-size: 0.7rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 4px; margin-top: 4px;
+    }
+    .vuln-card.critical .vuln-severity { background: var(--accent-red-dim); color: var(--accent-red); }
+    .vuln-card.high .vuln-severity { background: var(--accent-orange-dim); color: var(--accent-orange); }
+    .vuln-card.medium .vuln-severity { background: var(--accent-blue-dim); color: var(--accent-blue); }
+
+    .vuln-body { color: var(--text-secondary); font-size: 0.88rem; line-height: 1.65; }
+    .vuln-body strong { color: var(--text-primary); }
+
+    /* ─── ATTACK FLOW ─── */
+    .attack-flow {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 2rem;
+      margin-top: 2rem;
+    }
+    .attack-flow h3 {
+      font-size: 1.1rem; font-weight: 700; margin-bottom: 1.5rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .flow-steps {
+      display: flex; flex-direction: column; gap: 0;
+    }
+    .flow-step {
+      display: flex; align-items: flex-start; gap: 1rem;
+      position: relative; padding-bottom: 1.5rem;
+    }
+    .flow-step:last-child { padding-bottom: 0; }
+    .flow-step::before {
+      content: ''; position: absolute;
+      left: 17px; top: 36px; bottom: 0;
+      width: 2px; background: var(--border);
+    }
+    .flow-step:last-child::before { display: none; }
+    .flow-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--accent-red-dim);
+      color: var(--accent-red);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .flow-content h4 { font-size: 0.92rem; font-weight: 700; margin-bottom: 2px; }
+    .flow-content p { font-size: 0.82rem; color: var(--text-secondary); }
+
+    /* ─── COMPANY BAN TABLE ─── */
+    .ban-section { margin-top: 2rem; }
+    .ban-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+    }
+    .ban-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px; padding: 1.5rem;
+      display: flex; align-items: flex-start; gap: 1rem;
+      transition: border-color 0.2s;
+    }
+    .ban-card:hover { border-color: var(--accent-purple); }
+    .ban-logo {
+      width: 44px; height: 44px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .ban-logo.kr { background: var(--accent-green-dim); color: var(--accent-green); }
+    .ban-logo.global { background: var(--accent-purple-dim); color: var(--accent-purple); }
+    .ban-info h4 { font-size: 0.92rem; font-weight: 700; }
+    .ban-info p { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.5; }
+    .ban-tag {
+      display: inline-block; font-size: 0.68rem; font-weight: 700;
+      padding: 2px 8px; border-radius: 4px; margin-top: 6px;
+      background: var(--accent-red-dim); color: var(--accent-red);
+    }
+
+    /* ─── RISK MATRIX ─── */
+    .risk-table-wrap {
+      overflow-x: auto; margin-top: 1.5rem;
+      border: 1px solid var(--border); border-radius: 12px;
+    }
+    .risk-table {
+      width: 100%; border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    .risk-table thead { background: var(--bg-card); }
+    .risk-table th {
+      padding: 14px 16px; text-align: left;
+      font-weight: 700; font-size: 0.78rem;
+      text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .risk-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .risk-table tbody tr:last-child td { border-bottom: none; }
+    .risk-table tbody tr:hover { background: var(--bg-card-hover); }
+    .risk-badge {
+      display: inline-block; font-size: 0.72rem; font-weight: 700;
+      padding: 3px 10px; border-radius: 6px;
+    }
+    .risk-badge.extreme { background: var(--accent-red-dim); color: var(--accent-red); }
+    .risk-badge.very-high { background: var(--accent-orange-dim); color: var(--accent-orange); }
+    .risk-badge.high { background: var(--accent-blue-dim); color: var(--accent-blue); }
+    .risk-badge.low { background: var(--accent-green-dim); color: var(--accent-green); }
+
+    /* ─── RECOMMENDATIONS ─── */
+    .rec-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+    }
+    .rec-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px; padding: 1.75rem;
+      border-left: 4px solid var(--accent-blue);
+    }
+    .rec-card.enterprise { border-left-color: var(--accent-red); }
+    .rec-card.eval { border-left-color: var(--accent-orange); }
+    .rec-card.personal { border-left-color: var(--accent-green); }
+    .rec-card h3 {
+      font-size: 1rem; font-weight: 700; margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .rec-list { list-style: none; }
+    .rec-list li {
+      font-size: 0.85rem; color: var(--text-secondary);
+      padding: 6px 0; padding-left: 1.5rem;
+      position: relative; line-height: 1.55;
+    }
+    .rec-list li::before {
+      content: ''; position: absolute; left: 0; top: 13px;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent-blue);
+    }
+    .rec-card.enterprise .rec-list li::before { background: var(--accent-red); }
+    .rec-card.eval .rec-list li::before { background: var(--accent-orange); }
+    .rec-card.personal .rec-list li::before { background: var(--accent-green); }
+
+    /* ─── CERT TABLE ─── */
+    .cert-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0.75rem; margin-top: 1.5rem;
+    }
+    .cert-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px; padding: 1rem;
+      text-align: center;
+    }
+    .cert-item .cert-name { font-size: 0.85rem; font-weight: 700; }
+    .cert-item .cert-status {
+      font-size: 0.75rem; margin-top: 6px;
+      color: var(--accent-red);
+      font-weight: 600;
+    }
+
+    /* ─── SOURCES ─── */
+    .sources-list { list-style: none; }
+    .sources-list li {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.84rem;
+    }
+    .sources-list li:last-child { border-bottom: none; }
+    .sources-list a {
+      color: var(--accent-cyan);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .sources-list a:hover { color: var(--accent-blue); text-decoration: underline; }
+    .source-tag {
+      display: inline-block; font-size: 0.65rem; font-weight: 600;
+      padding: 1px 6px; border-radius: 3px;
+      background: var(--bg-card); color: var(--text-muted);
+      margin-right: 6px;
+    }
+
+    /* ─── FOOTER ─── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+    footer a { color: var(--accent-cyan); text-decoration: none; }
+
+    /* ─── DIVIDER ─── */
+    .divider {
+      height: 1px; background: var(--border);
+      margin: 0 auto; max-width: 200px;
+    }
+
+    /* ─── MOBILE ─── */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-hamburger { display: block; }
+      nav.open .nav-links {
+        display: flex; flex-direction: column;
+        position: absolute; top: 56px; left: 0; right: 0;
+        background: rgba(10,14,23,0.97);
+        backdrop-filter: blur(16px);
+        padding: 1rem; gap: 0;
+        border-bottom: 1px solid var(--border);
+      }
+      nav.open .nav-links a {
+        padding: 12px 16px; font-size: 0.9rem;
+        border-radius: 8px;
+      }
+      nav.open .nav-hamburger span:nth-child(1) { transform: rotate(45deg); top: 15px; }
+      nav.open .nav-hamburger span:nth-child(2) { opacity: 0; }
+      nav.open .nav-hamburger span:nth-child(3) { transform: rotate(-45deg); top: 15px; }
+
+      .hero { padding: 100px 1.25rem 40px; }
+      .hero-meta { gap: 1rem; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+      .vuln-grid { grid-template-columns: 1fr; }
+      .ban-grid { grid-template-columns: 1fr; }
+      .rec-grid { grid-template-columns: 1fr; }
+      .cert-grid { grid-template-columns: repeat(2, 1fr); }
+      section { padding: 3rem 0; }
+      .attack-flow { padding: 1.25rem; }
+    }
+
+    @media (max-width: 400px) {
+      .stats { grid-template-columns: 1fr; }
+      .cert-grid { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 1.55rem; }
+    }
+  </style>
+</head>
+<body>
+  <!-- NAV -->
+  <nav id="nav">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        OpenClaw Security
+      </a>
+      <div class="nav-links">
+        <a href="#vulnerabilities">취약점</a>
+        <a href="#enterprise">기업 현황</a>
+        <a href="#risk-matrix">위험 매트릭스</a>
+        <a href="#recommendations">권고사항</a>
+        <a href="#sources">출처</a>
+      </div>
+      <button class="nav-hamburger" onclick="document.getElementById('nav').classList.toggle('open')" aria-label="메뉴">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="container">
+      <div class="hero-badge"><span class="pulse"></span> 보안 경고 리서치</div>
+      <h1>
+        <span class="highlight">OpenClaw</span> 보안 취약점<br>
+        상업용 위험성 분석 보고서
+      </h1>
+      <p>오픈클로(OpenClaw) AI 에이전트의 CVE 취약점, 공급망 공격, 데이터 유출 사례 및 기업 사용 시 위험성을 종합 분석한 리서치 보고서입니다.</p>
+      <div class="hero-meta">
+        <span>2026년 2월 28일</span>
+        <span>Deep Research</span>
+        <span>신뢰도: 높음</span>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-number">512</div>
+          <div class="stat-label">발견된 총 취약점</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">CVSS 8.8</div>
+          <div class="stat-label">CVE-2026-25253 심각도</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">42,665</div>
+          <div class="stat-label">인터넷 노출 인스턴스</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number">800+</div>
+          <div class="stat-label">ClawHub 악성 스킬</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- VULNERABILITIES -->
+  <section id="vulnerabilities">
+    <div class="container">
+      <span class="section-label">Security Vulnerabilities</span>
+      <h2 class="section-title">주요 보안 취약점</h2>
+      <p class="section-desc">2026년 1월 보안 감사에서 512개 취약점이 발견되었으며, 이 중 8개가 치명적 등급으로 분류되었습니다.</p>
+
+      <div class="vuln-grid">
+        <!-- CVE-2026-25253 -->
+        <div class="vuln-card critical">
+          <div class="vuln-header">
+            <div class="vuln-icon">&#x1f4a5;</div>
+            <div>
+              <div class="vuln-title">CVE-2026-25253: 1-Click RCE</div>
+              <span class="vuln-severity">CRITICAL &middot; CVSS 8.8</span>
+            </div>
+          </div>
+          <div class="vuln-body">
+            컨트롤 UI가 <strong>gatewayUrl 쿼리 파라미터를 검증 없이 신뢰</strong>하여 악성 링크 클릭 한 번으로 인증 토큰이 탈취됩니다. WebSocket origin 헤더 미검증으로 <strong>Cross-Site WebSocket Hijacking</strong>이 가능하며, localhost에서도 취약합니다.
+          </div>
+        </div>
+
+        <!-- API Key -->
+        <div class="vuln-card critical">
+          <div class="vuln-header">
+            <div class="vuln-icon">&#x1f511;</div>
+            <div>
+              <div class="vuln-title">API 키 평문 저장</div>
+              <span class="vuln-severity">CRITICAL</span>
+            </div>
+          </div>
+          <div class="vuln-body">
+            <strong>~/.openclaw/credentials/</strong> 에 API 키가 암호화 없이 저장됩니다. 삭제한 키도 <strong>.bak 파일에 잔존</strong>하며, AMOS/RedLine 등 정보 탈취 악성코드의 주요 표적입니다. 토큰 복잡도 정책이 없어 "a"도 유효한 패스워드입니다.
+          </div>
+        </div>
+
+        <!-- Supply Chain -->
+        <div class="vuln-card high">
+          <div class="vuln-header">
+            <div class="vuln-icon">&#x1f4e6;</div>
+            <div>
+              <div class="vuln-title">ClawHavoc 공급망 공격</div>
+              <span class="vuln-severity">HIGH &middot; 800+ 악성 스킬</span>
+            </div>
+          </div>
+          <div class="vuln-body">
+            공식 마켓플레이스 ClawHub의 <strong>~20%가 악성 스킬</strong>입니다. 가짜 사전 요구사항으로 <strong>Atomic macOS Stealer(AMOS)</strong>를 설치하며, 3일 만에 최초 14개의 악성 스킬이 업로드되었습니다.
+          </div>
+        </div>
+
+        <!-- Prompt Injection -->
+        <div class="vuln-card high">
+          <div class="vuln-header">
+            <div class="vuln-icon">&#x1f4ac;</div>
+            <div>
+              <div class="vuln-title">프롬프트 인젝션</div>
+              <span class="vuln-severity">HIGH</span>
+            </div>
+          </div>
+          <div class="vuln-body">
+            이메일에 삽입된 프롬프트 인젝션으로 <strong>개인 키(private key) 탈취가 실증</strong>되었습니다 (Archestra.AI CEO 시연). AI 에이전트가 시스템 권한을 가진 상태에서 전통적 보안 경계가 무력화됩니다.
+          </div>
+        </div>
+
+        <!-- Auth Bypass -->
+        <div class="vuln-card high">
+          <div class="vuln-header">
+            <div class="vuln-icon">&#x1f513;</div>
+            <div>
+              <div class="vuln-title">인증 우회</div>
+              <span class="vuln-severity">HIGH &middot; 93.4% 인스턴스</span>
+            </div>
+          </div>
+          <div class="vuln-body">
+            인터넷에 노출된 <strong>42,665개 인스턴스</strong> 중 93.4%가 인증 우회 취약점을 보유합니다. 브루트포스 공격에 취약하며, 인증 없이 직접 접근 가능한 경우도 다수입니다.
+          </div>
+        </div>
+
+        <!-- Moltbook -->
+        <div class="vuln-card medium">
+          <div class="vuln-header">
+            <div class="vuln-icon">&#x1f4ca;</div>
+            <div>
+              <div class="vuln-title">Moltbook 데이터 유출</div>
+              <span class="vuln-severity">MEDIUM &middot; 150만 토큰</span>
+            </div>
+          </div>
+          <div class="vuln-body">
+            소셜 플랫폼 Moltbook의 Supabase 설정 오류로 <strong>35,000개 이메일</strong>과 <strong>1,500,000개 에이전트 토큰</strong>이 유출되었습니다. 누구나 해당 에이전트의 제어권을 탈취할 수 있었습니다.
+          </div>
+        </div>
+      </div>
+
+      <!-- Attack Flow -->
+      <div class="attack-flow">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          CVE-2026-25253 공격 흐름
+        </h3>
+        <div class="flow-steps">
+          <div class="flow-step">
+            <div class="flow-num">1</div>
+            <div class="flow-content">
+              <h4>게이트웨이 URL 조작</h4>
+              <p>공격자가 악성 gatewayUrl이 포함된 링크를 생성합니다</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">2</div>
+            <div class="flow-content">
+              <h4>인증 토큰 탈취</h4>
+              <p>피해자가 링크 클릭 시 오픈클로가 공격자 서버로 인증 토큰을 자동 전송합니다</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">3</div>
+            <div class="flow-content">
+              <h4>WebSocket Hijacking</h4>
+              <p>Origin 헤더 미검증으로 공격자의 JavaScript가 로컬 인스턴스에 연결됩니다</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">4</div>
+            <div class="flow-content">
+              <h4>시스템 장악</h4>
+              <p>보안 가드레일을 해제하고 임의 셸 명령을 실행하여 PC 제어권을 탈취합니다</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ENTERPRISE BAN -->
+  <section id="enterprise">
+    <div class="container">
+      <span class="section-label">Enterprise Response</span>
+      <h2 class="section-title">기업 사용 금지 및 보안 평가</h2>
+      <p class="section-desc">국내외 주요 기업과 글로벌 보안 업체들이 오픈클로의 기업 환경 사용을 강력히 경고하고 있습니다.</p>
+
+      <div class="ban-grid">
+        <div class="ban-card">
+          <div class="ban-logo kr">N</div>
+          <div class="ban-info">
+            <h4>네이버</h4>
+            <p>사내망 및 업무용 기기에서 사용 금지/제한 내부 지침 공지</p>
+            <span class="ban-tag">2026.02.08 시행</span>
+          </div>
+        </div>
+        <div class="ban-card">
+          <div class="ban-logo kr">K</div>
+          <div class="ban-info">
+            <h4>카카오</h4>
+            <p>사내 사용 전면 금지령 발표</p>
+            <span class="ban-tag">2026.02.08 시행</span>
+          </div>
+        </div>
+        <div class="ban-card">
+          <div class="ban-logo kr">D</div>
+          <div class="ban-info">
+            <h4>당근마켓</h4>
+            <p>사내 사용 전면 금지령 발표</p>
+            <span class="ban-tag">2026.02.08 시행</span>
+          </div>
+        </div>
+        <div class="ban-card">
+          <div class="ban-logo global">MS</div>
+          <div class="ban-info">
+            <h4>Microsoft</h4>
+            <p>"표준 워크스테이션에서 실행 부적합. 완전 격리된 환경에서만 평가해야 함"</p>
+            <span class="ban-tag">보안 권고</span>
+          </div>
+        </div>
+        <div class="ban-card">
+          <div class="ban-logo global">CS</div>
+          <div class="ban-info">
+            <h4>CrowdStrike</h4>
+            <p>"직원이 업무 노트북에 설치하면 적대자를 위한 강력한 AI 백도어로 작동 가능"</p>
+            <span class="ban-tag">보안 경고</span>
+          </div>
+        </div>
+        <div class="ban-card">
+          <div class="ban-logo global">PA</div>
+          <div class="ban-info">
+            <h4>Palo Alto Networks</h4>
+            <p>"2026년 최대의 내부자 위협이 될 가능성"</p>
+            <span class="ban-tag">위협 분석</span>
+          </div>
+        </div>
+        <div class="ban-card">
+          <div class="ban-logo global">KS</div>
+          <div class="ban-info">
+            <h4>Kaspersky</h4>
+            <p>"비전문가가 설치할 수 있는 가장 위험한 소프트웨어 중 하나"</p>
+            <span class="ban-tag">보안 경고</span>
+          </div>
+        </div>
+        <div class="ban-card">
+          <div class="ban-logo global">SC</div>
+          <div class="ban-info">
+            <h4>Cisco / Sophos</h4>
+            <p>"개인 AI 에이전트는 보안의 악몽" / "기업 AI 보안에 대한 경고탄"</p>
+            <span class="ban-tag">보안 경고</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Certifications -->
+      <h3 style="margin-top:2.5rem; font-size:1.05rem; font-weight:700; margin-bottom:0.5rem;">기업 보안 인증 현황</h3>
+      <p style="font-size:0.85rem; color:var(--text-secondary); margin-bottom:0;">오픈클로는 기업 환경에서 요구되는 보안 인증을 보유하고 있지 않습니다.</p>
+      <div class="cert-grid">
+        <div class="cert-item"><div class="cert-name">SOC 2</div><div class="cert-status">미보유</div></div>
+        <div class="cert-item"><div class="cert-name">ISO 27001</div><div class="cert-status">미보유</div></div>
+        <div class="cert-item"><div class="cert-name">HIPAA</div><div class="cert-status">미준수</div></div>
+        <div class="cert-item"><div class="cert-name">GDPR</div><div class="cert-status">자체 구현 필요</div></div>
+        <div class="cert-item"><div class="cert-name">감사 로깅</div><div class="cert-status">미지원</div></div>
+        <div class="cert-item"><div class="cert-name">RBAC</div><div class="cert-status">미지원</div></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- RISK MATRIX -->
+  <section id="risk-matrix">
+    <div class="container">
+      <span class="section-label">Risk Assessment</span>
+      <h2 class="section-title">종합 위험 매트릭스</h2>
+      <p class="section-desc">각 위험 영역의 심각도, 발생 가능성, 종합 위험도를 평가합니다.</p>
+
+      <div class="risk-table-wrap">
+        <table class="risk-table">
+          <thead>
+            <tr>
+              <th>위험 영역</th>
+              <th>심각도</th>
+              <th>발생 가능성</th>
+              <th>종합 위험도</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>원격 코드 실행 (RCE)</td>
+              <td>치명적</td>
+              <td>높음</td>
+              <td><span class="risk-badge extreme">극히 높음</span></td>
+            </tr>
+            <tr>
+              <td>API 키/자격증명 탈취</td>
+              <td>높음</td>
+              <td>높음</td>
+              <td><span class="risk-badge very-high">매우 높음</span></td>
+            </tr>
+            <tr>
+              <td>공급망 공격 (악성 스킬)</td>
+              <td>높음</td>
+              <td>높음</td>
+              <td><span class="risk-badge very-high">매우 높음</span></td>
+            </tr>
+            <tr>
+              <td>프롬프트 인젝션</td>
+              <td>높음</td>
+              <td>중간</td>
+              <td><span class="risk-badge high">높음</span></td>
+            </tr>
+            <tr>
+              <td>데이터 유출/프라이버시</td>
+              <td>높음</td>
+              <td>중간</td>
+              <td><span class="risk-badge high">높음</span></td>
+            </tr>
+            <tr>
+              <td>컴플라이언스 위반</td>
+              <td>중간</td>
+              <td>높음</td>
+              <td><span class="risk-badge high">높음</span></td>
+            </tr>
+            <tr>
+              <td>인증 우회</td>
+              <td>높음</td>
+              <td>중간</td>
+              <td><span class="risk-badge high">높음</span></td>
+            </tr>
+            <tr>
+              <td>라이선스 위험</td>
+              <td>낮음</td>
+              <td>낮음</td>
+              <td><span class="risk-badge low">낮음</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- RECOMMENDATIONS -->
+  <section id="recommendations">
+    <div class="container">
+      <span class="section-label">Recommendations</span>
+      <h2 class="section-title">권고사항</h2>
+      <p class="section-desc">대상별 보안 권고사항입니다.</p>
+
+      <div class="rec-grid">
+        <div class="rec-card enterprise">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2" stroke-linecap="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 00-8 0v2"/></svg>
+            기업 - 즉시 조치
+          </h3>
+          <ul class="rec-list">
+            <li>사내 사용 전면 금지 또는 엄격한 통제 정책 수립</li>
+            <li>기존 설치 인스턴스 탐지 및 제거 (SecureClaw 등 탐지 도구 활용)</li>
+            <li>업무 기기에서의 비인가 AI 에이전트 설치 모니터링 체계 구축</li>
+            <li>Shadow AI 정책 수립 및 임직원 교육 실시</li>
+          </ul>
+        </div>
+
+        <div class="rec-card eval">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-orange)" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            불가피한 평가 시
+          </h3>
+          <ul class="rec-list">
+            <li>완전 격리된 환경에서만 운영 (전용 VM 또는 별도 물리 시스템)</li>
+            <li>비권한 전용 계정 사용 및 비민감 데이터만 접근 허용</li>
+            <li>최소 v2026.1.29 이상으로 업데이트</li>
+            <li>ClawHub 스킬은 반드시 코드 리뷰 후 설치</li>
+            <li>지속적 모니터링 및 재구축 계획 수립</li>
+          </ul>
+        </div>
+
+        <div class="rec-card personal">
+          <h3>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2" stroke-linecap="round"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            개인 사용자
+          </h3>
+          <ul class="rec-list">
+            <li>최신 버전(v2026.1.29+)으로 반드시 업데이트</li>
+            <li>강력한 인증 토큰 설정</li>
+            <li>인터넷에 인스턴스를 노출하지 않기</li>
+            <li>의심스러운 스킬 설치 자제 및 API 키 정기 교체</li>
+            <li>이메일 자동 처리 등 민감한 자동화 기능 주의</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- SOURCES -->
+  <section id="sources">
+    <div class="container">
+      <span class="section-label">Sources &amp; References</span>
+      <h2 class="section-title">출처</h2>
+      <p class="section-desc">본 리서치에 사용된 주요 출처 목록입니다.</p>
+
+      <ul class="sources-list">
+        <li><span class="source-tag">CVE</span><a href="https://nvd.nist.gov/vuln/detail/CVE-2026-25253" target="_blank" rel="noopener">NVD - CVE-2026-25253</a></li>
+        <li><span class="source-tag">분석</span><a href="https://thehackernews.com/2026/02/openclaw-bug-enables-one-click-remote.html" target="_blank" rel="noopener">The Hacker News: OpenClaw 1-Click RCE</a></li>
+        <li><span class="source-tag">분석</span><a href="https://socradar.io/blog/cve-2026-25253-rce-openclaw-auth-token/" target="_blank" rel="noopener">SOCRadar: CVE-2026-25253 RCE Analysis</a></li>
+        <li><span class="source-tag">공급망</span><a href="https://thehackernews.com/2026/02/researchers-find-341-malicious-clawhub.html" target="_blank" rel="noopener">The Hacker News: 341 Malicious ClawHub Skills</a></li>
+        <li><span class="source-tag">공급망</span><a href="https://cyberpress.org/clawhavoc-poisons-openclaws-clawhub-with-1184-malicious-skills/" target="_blank" rel="noopener">CyberPress: ClawHavoc 1,184 Malicious Skills</a></li>
+        <li><span class="source-tag">공급망</span><a href="https://www.trendmicro.com/en_us/research/26/b/openclaw-skills-used-to-distribute-atomic-macos-stealer.html" target="_blank" rel="noopener">Trend Micro: Atomic macOS Stealer Distribution</a></li>
+        <li><span class="source-tag">기업</span><a href="https://www.microsoft.com/en-us/security/blog/2026/02/19/running-openclaw-safely-identity-isolation-runtime-risk/" target="_blank" rel="noopener">Microsoft Security Blog: Running OpenClaw Safely</a></li>
+        <li><span class="source-tag">기업</span><a href="https://www.crowdstrike.com/en-us/blog/what-security-teams-need-to-know-about-openclaw-ai-super-agent/" target="_blank" rel="noopener">CrowdStrike: What Security Teams Need to Know</a></li>
+        <li><span class="source-tag">기업</span><a href="https://www.kaspersky.com/blog/moltbot-enterprise-risk-management/55317/" target="_blank" rel="noopener">Kaspersky: Key OpenClaw Risks</a></li>
+        <li><span class="source-tag">기업</span><a href="https://www.sophos.com/en-us/blog/the-openclaw-experiment-is-a-warning-shot-for-enterprise-ai-security" target="_blank" rel="noopener">Sophos: Enterprise AI Security Warning</a></li>
+        <li><span class="source-tag">국내</span><a href="https://www.pointe.co.kr/news/articleView.html?idxno=71344" target="_blank" rel="noopener">포인트경제: 네이버/카카오/당근 오픈클로 금지령</a></li>
+        <li><span class="source-tag">국내</span><a href="https://zdnet.co.kr/view/?no=20260209143822" target="_blank" rel="noopener">ZDNet Korea: 네카당이 금지한 오픈클로</a></li>
+        <li><span class="source-tag">유출</span><a href="https://adversa.ai/blog/openclaw-security-101-vulnerabilities-hardening-2026/" target="_blank" rel="noopener">Adversa.AI: OpenClaw Security Guide 2026</a></li>
+        <li><span class="source-tag">유출</span><a href="https://conscia.com/blog/the-openclaw-security-crisis/" target="_blank" rel="noopener">Conscia: The OpenClaw Security Crisis</a></li>
+        <li><span class="source-tag">유출</span><a href="https://www.giskard.ai/knowledge/openclaw-security-vulnerabilities-include-data-leakage-and-prompt-injection-risks" target="_blank" rel="noopener">Giskard: Data Leakage &amp; Prompt Injection</a></li>
+        <li><span class="source-tag">유출</span><a href="https://www.bitsight.com/blog/openclaw-ai-security-risks-exposed-instances" target="_blank" rel="noopener">Bitsight: Exposed AI Agents</a></li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="container">
+      <p>본 보고서는 2026년 2월 28일 기준 공개된 정보를 바탕으로 작성되었습니다.</p>
+      <p style="margin-top:6px;">
+        <a href="https://github.com/kyangkyongkyungkyang/openclaw-security-research" target="_blank" rel="noopener">GitHub</a>
+        &nbsp;&middot;&nbsp;
+        MIT License
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    // Close mobile nav on link click
+    document.querySelectorAll('.nav-links a').forEach(link => {
+      link.addEventListener('click', () => {
+        document.getElementById('nav').classList.remove('open');
+      });
+    });
+  </script>
+</body>
+</html>
